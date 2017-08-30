@@ -3,13 +3,16 @@ package com.intracom.padi.oilchange;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.format.DateUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Chronometer;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -18,12 +21,14 @@ import com.mikhaellopez.circularprogressbar.CircularProgressBar;
 
 public class MainActivity extends AppCompatActivity {
     private boolean isChronometerRunning;
-    private Chronometer timer;
-    private FloatingActionButton btnTimer;
-    private TextView totElapsed;
+    private Chronometer chrElapsedTime;
+    private FloatingActionButton btnStartStop;
+    private TextView txtUsedTime;
+    private EditText txtTotalTime;
     private SharedPreferences settings;
-    private CircularProgressBar prgBar;
+    private CircularProgressBar prgUsedTime;
     private SharedPreferences.Editor editor;
+    private static final long TOTAL_TIME = 180000;
     private static final String TAG = "PADI_DEBUG";
 
     @Override
@@ -34,60 +39,60 @@ public class MainActivity extends AppCompatActivity {
         settings = getPreferences(0);
         editor = settings.edit();
 
-//        editor.putString("total", "50:00:00");
-//        editor.apply();
-
-        btnTimer = (FloatingActionButton) findViewById(R.id.btnStartStop);
-        timer = (Chronometer) findViewById(R.id.timer);
-        EditText total = (EditText) findViewById(R.id.txtTotal);
-        totElapsed = (TextView) findViewById(R.id.totElapsedTime);
-        prgBar = (CircularProgressBar) findViewById(R.id.progressBar);
+        btnStartStop = (FloatingActionButton) findViewById(R.id.btnStartStop);
+        FloatingActionButton btnReset = (FloatingActionButton) findViewById(R.id.btnReset);
+        chrElapsedTime = (Chronometer) findViewById(R.id.chrElapsedTime);
+        txtTotalTime = (EditText) findViewById(R.id.txtTotalTime);
+        txtUsedTime = (TextView) findViewById(R.id.txtUsedTime);
+        prgUsedTime = (CircularProgressBar) findViewById(R.id.prgUsedTime);
 
         isChronometerRunning = false;
-        total.setText(settings.getString("total", "50:00:00"));
         updateTimes();
 
-        total.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        txtTotalTime.setOnEditorActionListener(
+                new EditText.OnEditorActionListener() {
+                    @Override
+                    public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                        if (actionId == EditorInfo.IME_ACTION_DONE) {
+                            String s = txtTotalTime.getText().toString();
+                            if (s.matches("\\d+:\\d+:\\d+||\\d+:\\d+")) {
+                                editor.putLong("total", convertStrTimeToLong(s));
+                                editor.apply();
+                            }
+                            updateTimes();
+                        }
+                        return false;
+                    }
+                });
 
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (s.toString().matches("\\d+:\\d+:\\d+")) {
-                    editor.putString("total", s.toString());
-                    editor.apply();
-
-                    updateTimes();
-                }
-            }
-        });
-
-        btnTimer.setOnClickListener(new View.OnClickListener() {
+        btnStartStop.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 if (isChronometerRunning) {
-                    long elapsedTime = (SystemClock.elapsedRealtime() - timer.getBase()) / 1000;
+                    long elapsedTime = (SystemClock.elapsedRealtime() - chrElapsedTime.getBase()) / 1000;
                     long totElapsedTime = settings.getLong("elapsed", 0);
                     editor.putLong("elapsed", elapsedTime + totElapsedTime);
                     editor.apply();
                     updateTimes();
 
-                    timer.stop();
-                    timer.setBase(SystemClock.elapsedRealtime());
+                    chrElapsedTime.stop();
+                    chrElapsedTime.setBase(SystemClock.elapsedRealtime());
                     isChronometerRunning = false;
-                    btnTimer.setImageResource(R.drawable.ic_play);
+                    btnStartStop.setImageResource(R.drawable.ic_play);
                 } else {
-                    timer.setBase(SystemClock.elapsedRealtime());
-                    timer.start();
+                    chrElapsedTime.setBase(SystemClock.elapsedRealtime());
+                    chrElapsedTime.start();
                     isChronometerRunning = true;
-                    btnTimer.setImageResource(R.drawable.ic_stop);
+                    btnStartStop.setImageResource(R.drawable.ic_stop);
                 }
+            }
+        });
+
+        btnReset.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                editor.putLong("elapsed", 0);
+                editor.apply();
+                updateTimes();
             }
         });
     }
@@ -96,21 +101,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
 
-        // We need an Editor object to make preference changes.
-        // All objects are from android.context.Context
-//        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-//        SharedPreferences.Editor editor = settings.edit();
-//        editor.putBoolean("silentMode", mSilentMode);
-//
-//        // Commit the edits!
-//        editor.commit();
+        if (isChronometerRunning) {
+            long elapsedTime = (SystemClock.elapsedRealtime() - chrElapsedTime.getBase()) / 1000;
+            long totElapsedTime = settings.getLong("elapsed", 0);
+            editor.putLong("elapsed", elapsedTime + totElapsedTime);
+            editor.apply();
+        }
     }
 
     /**
-     * Convert the time of the String type to long, such as:12:01:08
-     * strTime String @param type of time
-     * long@return type of time
-     **/
+     * Convert a String representing time to long
+     *
+     * @param strTime String representing time in HH:MM:SS or MM:SS format
+     * @return The long number of seconds
+     */
     protected long convertStrTimeToLong(String strTime) {
         String[] timeArr = strTime.split(":");
         long longTime = (long) 0;
@@ -123,14 +127,25 @@ public class MainActivity extends AppCompatActivity {
         return longTime;
     }
 
+    /**
+     * Update the UI elements with needed changes
+     */
     protected void updateTimes() {
-        long tot = convertStrTimeToLong(settings.getString("total", "50:00:00"));
+        long tot = settings.getLong("total", TOTAL_TIME);
         long elapsed = settings.getLong("elapsed", 0);
         float percent = (elapsed * 100.0f) / tot;
-        totElapsed.setText(String.format("%s - %s", "Used Time", DateUtils.formatElapsedTime(elapsed)));
-        prgBar.setProgress(percent);
-        Log.d(TAG, "percent " + percent);
-        Log.d(TAG, "elapsed " + elapsed);
-        Log.d(TAG, "tot " + tot);
+        txtUsedTime.setText(String.format("%s - %s", "Used Time", DateUtils.formatElapsedTime(elapsed)));
+        txtTotalTime.setText(DateUtils.formatElapsedTime(tot));
+        if (percent < 60.0) {
+            prgUsedTime.setColor(ContextCompat.getColor(this, R.color.green));
+            prgUsedTime.setBackgroundColor(ContextCompat.getColor(this, R.color.background_green));
+        } else if (percent >= 60.0 && percent < 80.0) {
+            prgUsedTime.setColor(ContextCompat.getColor(this, R.color.orange));
+            prgUsedTime.setBackgroundColor(ContextCompat.getColor(this, R.color.background_orange));
+        } else {
+            prgUsedTime.setColor(ContextCompat.getColor(this, R.color.red));
+            prgUsedTime.setBackgroundColor(ContextCompat.getColor(this, R.color.background_red));
+        }
+        prgUsedTime.setProgress(percent);
     }
 }
