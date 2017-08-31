@@ -1,5 +1,7 @@
 package com.intracom.padi.oilchange;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.support.design.widget.FloatingActionButton;
@@ -11,6 +13,7 @@ import android.text.TextWatcher;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Chronometer;
@@ -41,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
 
         btnStartStop = (FloatingActionButton) findViewById(R.id.btnStartStop);
         FloatingActionButton btnReset = (FloatingActionButton) findViewById(R.id.btnReset);
+        FloatingActionButton btnAddTime = (FloatingActionButton) findViewById(R.id.btnAddTime);
         chrElapsedTime = (Chronometer) findViewById(R.id.chrElapsedTime);
         txtTotalTime = (EditText) findViewById(R.id.txtTotalTime);
         txtUsedTime = (TextView) findViewById(R.id.txtUsedTime);
@@ -90,9 +94,63 @@ public class MainActivity extends AppCompatActivity {
         btnReset.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editor.putLong("elapsed", 0);
-                editor.apply();
-                updateTimes();
+                AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(MainActivity.this);
+                alertDialogBuilder.setTitle("Reset Used Time");
+                alertDialogBuilder
+                        .setMessage("Are you sure you want to reset Used Time")
+                        .setCancelable(true)
+                        .setPositiveButton("Yes",new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog,int id) {
+                                editor.putLong("elapsed", 0);
+                                editor.apply();
+                                updateTimes();
+                            }
+                        })
+                        .setNegativeButton("No",new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog,int id) {
+                                dialog.cancel();
+                            }
+                        });
+
+                AlertDialog alertDialog = alertDialogBuilder.create();
+                alertDialog.show();
+            }
+        });
+
+        btnAddTime.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                // Get the layout inflater
+                LayoutInflater inflater = MainActivity.this.getLayoutInflater();
+                final View dialogView = inflater.inflate(R.layout.add_time, null);
+
+                // Inflate and set the layout for the dialog
+                // Pass null as the parent view because its going in the dialog layout
+                builder.setView(dialogView)
+                        .setTitle("Add Used Time")
+                        .setCancelable(true)
+                        .setPositiveButton("Save",new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog,int id) {
+                                EditText txtAddTime = (EditText) dialogView.findViewById(R.id.txtAddTime);
+                                String s = txtAddTime.getText().toString();
+                                if (s.matches("\\d+:\\d+:\\d+||\\d+:\\d+")) {
+                                    long totElapsedTime = settings.getLong("elapsed", 0);
+                                    totElapsedTime += convertStrTimeToLong(s);
+                                    editor.putLong("elapsed", totElapsedTime);
+                                    editor.apply();
+                                }
+                                updateTimes();
+                            }
+                        })
+                        .setNegativeButton("Cancel",new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog,int id) {
+                                dialog.cancel();
+                            }
+                        });
+
+                AlertDialog alertDialog = builder.create();
+                alertDialog.show();
             }
         });
     }

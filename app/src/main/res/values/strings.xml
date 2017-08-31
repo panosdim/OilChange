@@ -3,4 +3,5 @@
     <string name="time_between_oil_change">Time between oil change</string>
     <string name="time_in_hh_mm_ss_format">Time in HH:MM:SS format</string>
     <string name="used_time">Used Time</string>
+    <string name="add_used_time">Add Used Time</string>
 </resources>
